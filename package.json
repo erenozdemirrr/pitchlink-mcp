@@ -3,15 +3,19 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "tsx server.ts"
+    "dev": "tsx server.ts",
+    "start": "tsx server.ts"
+  },
+  "engines": {
+    "node": ">=20.0.0"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "1.12.1",
-    "@notionhq/client": "2.3.0",
-    "zod": "3.24.0"
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "@notionhq/client": "^2.3.0",
+    "tsx": "^4.19.0",
+    "zod": "^3.24.0"
   },
   "devDependencies": {
-    "@types/node": "22.0.0",
-    "tsx": "4.19.0"
+    "@types/node": "^22.0.0"
   }
 }
