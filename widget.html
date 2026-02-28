@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>PitchLink</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg: #0A0A0F; --surface: #111118; --surface2: #18181F;
+    --border: rgba(255,255,255,0.07); --accent: #6EE7B7;
+    --accent2: #F59E0B; --accent3: #F87171; --accent4: #60A5FA;
+    --text: #F0F0F8; --muted: #6B7280; --strong: #22D3EE;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Syne',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
+  body::before {
+    content:''; position:fixed; inset:0; pointer-events:none; z-index:0;
+    background-image: linear-gradient(rgba(110,231,183,0.03) 1px,transparent 1px), linear-gradient(90deg,rgba(110,231,183,0.03) 1px,transparent 1px);
+    background-size:40px 40px;
+  }
+  .wrap { position:relative; z-index:1; max-width:860px; margin:0 auto; padding:2rem 1.5rem; }
+
+  /* TOP BAR */
+  .topbar { display:flex; align-items:center; justify-content:space-between; margin-bottom:2rem; padding-bottom:1rem; border-bottom:1px solid var(--border); }
+  .logo { font-family:'DM Mono',monospace; font-size:.65rem; color:var(--accent); letter-spacing:.18em; text-transform:uppercase; display:flex; align-items:center; gap:.5rem; }
+  .logo::before { content:''; width:6px; height:6px; background:var(--accent); border-radius:50%; box-shadow:0 0 8px var(--accent); }
+  .badge-le-chat { font-family:'DM Mono',monospace; font-size:.6rem; background:rgba(96,165,250,.1); border:1px solid rgba(96,165,250,.25); color:var(--accent4); padding:.2rem .6rem; border-radius:3px; letter-spacing:.08em; }
+
+  /* ANALYZE BAR */
+  .analyze-bar { display:flex; gap:.75rem; margin-bottom:1.5rem; }
+  .url-input { flex:1; background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:.75rem 1rem; font-family:'DM Mono',monospace; font-size:.8rem; color:var(--text); outline:none; transition:border-color .2s; }
+  .url-input:focus { border-color:rgba(110,231,183,.4); }
+  .url-input::placeholder { color:var(--muted); }
+  .btn-analyze { background:var(--accent); color:#0A0A0F; border:none; border-radius:8px; padding:.75rem 1.4rem; font-family:'Syne',sans-serif; font-size:.85rem; font-weight:700; cursor:pointer; white-space:nowrap; transition:opacity .2s; }
+  .btn-analyze:hover { opacity:.9; }
+  .btn-analyze:disabled { opacity:.4; cursor:not-allowed; }
+
+  /* HINT */
+  .hint { font-family:'DM Mono',monospace; font-size:.68rem; color:var(--muted); margin-bottom:2rem; line-height:1.6; background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:.85rem 1rem; }
+  .hint strong { color:var(--text); }
+
+  /* LOADING */
+  .loading { display:none; flex-direction:column; align-items:center; justify-content:center; padding:4rem; gap:1rem; }
+  .spinner { width:36px; height:36px; border:2px solid rgba(110,231,183,.15); border-top-color:var(--accent); border-radius:50%; animation:spin .8s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  .loading-text { font-family:'DM Mono',monospace; font-size:.7rem; color:var(--muted); letter-spacing:.1em; animation:pulse 1.5s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{opacity:.4} 50%{opacity:1} }
+
+  /* RESULTS */
+  #results { display:none; }
+
+  .header { display:flex; align-items:flex-start; justify-content:space-between; gap:1rem; margin-bottom:1.5rem; }
+  .pitch-eyebrow { font-family:'DM Mono',monospace; font-size:.62rem; color:var(--accent); letter-spacing:.15em; text-transform:uppercase; border:1px solid rgba(110,231,183,.2); padding:.2rem .6rem; border-radius:2px; margin-bottom:.5rem; display:inline-block; }
+  .pitch-title { font-size:clamp(1.3rem,3.5vw,2rem); font-weight:800; letter-spacing:-.03em; line-height:1.1; }
+  .pitch-tagline { font-family:'DM Mono',monospace; font-size:.76rem; color:var(--muted); margin-top:.4rem; }
+
+  /* SCORE RING */
+  .score-card { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:1.4rem; display:flex; flex-direction:column; align-items:center; min-width:148px; position:relative; overflow:hidden; flex-shrink:0; }
+  .score-card::after { content:''; position:absolute; inset:0; background:radial-gradient(circle at top center,rgba(110,231,183,.08),transparent 60%); pointer-events:none; }
+  .ring { position:relative; width:88px; height:88px; }
+  .ring svg { transform:rotate(-90deg); }
+  .ring-track { fill:none; stroke:rgba(255,255,255,.06); stroke-width:8; }
+  .ring-fill { fill:none; stroke:var(--accent); stroke-width:8; stroke-linecap:round; stroke-dasharray:251; stroke-dashoffset:251; transition:stroke-dashoffset 1.5s cubic-bezier(.34,1.56,.64,1); filter:drop-shadow(0 0 8px rgba(110,231,183,.6)); }
+  .ring-inner { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+  .ring-num { font-size:1.6rem; font-weight:800; line-height:1; color:var(--accent); }
+  .ring-denom { font-family:'DM Mono',monospace; font-size:.6rem; color:var(--muted); }
+  .score-grade { font-size:1.3rem; font-weight:800; margin-top:.6rem; }
+  .score-label { font-family:'DM Mono',monospace; font-size:.6rem; color:var(--muted); text-align:center; margin-top:.15rem; }
+
+  /* MEMO */
+  .memo { background:linear-gradient(135deg,rgba(110,231,183,.06),rgba(96,165,250,.04)); border:1px solid rgba(110,231,183,.2); border-radius:10px; padding:1rem 1.25rem 1rem 1.5rem; font-size:.875rem; line-height:1.65; color:#D1FAE5; font-style:italic; margin-bottom:1rem; position:relative; }
+  .memo::before { content:'"'; position:absolute; top:-.4rem; left:.8rem; font-size:3rem; color:rgba(110,231,183,.12); font-family:Georgia,serif; line-height:1; }
+
+  /* CARD */
+  .card { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:1.25rem; margin-bottom:1rem; }
+  .card-label { font-family:'DM Mono',monospace; font-size:.62rem; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); margin-bottom:1rem; }
+
+  /* SECTION BARS */
+  .sec-row { display:flex; align-items:center; gap:.75rem; padding:.55rem 0; border-bottom:1px solid var(--border); }
+  .sec-row:last-child { border-bottom:none; }
+  .sec-icon { font-size:1rem; width:1.4rem; text-align:center; }
+  .sec-name { flex:1; font-size:.82rem; font-weight:600; }
+  .bar-wrap { flex:2; height:4px; background:rgba(255,255,255,.05); border-radius:99px; overflow:hidden; }
+  .bar { height:100%; border-radius:99px; width:0; transition:width 1.2s cubic-bezier(.34,1.56,.64,1); }
+  .v-strong .bar { background:var(--accent); } .v-good .bar { background:var(--accent4); }
+  .v-weak .bar { background:var(--accent2); } .v-missing .bar { background:var(--accent3); }
+  .sec-score { font-family:'DM Mono',monospace; font-size:.72rem; width:2.2rem; text-align:right; }
+  .v-strong .sec-score{color:var(--accent)} .v-good .sec-score{color:var(--accent4)}
+  .v-weak .sec-score{color:var(--accent2)} .v-missing .sec-score{color:var(--accent3)}
+
+  /* GRID */
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:1rem; }
+  @media(max-width:560px){ .grid2{grid-template-columns:1fr} .header{flex-direction:column} }
+
+  /* ITEMS */
+  .item { display:flex; gap:.75rem; padding:.6rem 0; border-bottom:1px solid var(--border); }
+  .item:last-child { border-bottom:none; }
+  .item-icon { font-size:1rem; width:1.4rem; text-align:center; flex-shrink:0; margin-top:.1rem; }
+  .item-title { font-size:.84rem; font-weight:700; margin-bottom:.12rem; }
+  .item-detail { font-size:.76rem; color:var(--muted); line-height:1.5; }
+  .bx { display:inline-block; font-family:'DM Mono',monospace; font-size:.58rem; letter-spacing:.1em; padding:.1rem .4rem; border-radius:3px; text-transform:uppercase; margin-left:.4rem; vertical-align:middle; }
+  .bx-critical{background:rgba(248,113,113,.15);color:var(--accent3);border:1px solid rgba(248,113,113,.3)}
+  .bx-high{background:rgba(245,158,11,.15);color:var(--accent2);border:1px solid rgba(245,158,11,.3)}
+  .bx-medium{background:rgba(96,165,250,.12);color:var(--accent4);border:1px solid rgba(96,165,250,.2)}
+
+  /* MARKET */
+  .mkt-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:.75rem; margin-bottom:1rem; }
+  .mkt-pill { background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:.75rem 1rem; }
+  .mkt-label { font-family:'DM Mono',monospace; font-size:.58rem; color:var(--muted); text-transform:uppercase; letter-spacing:.1em; margin-bottom:.3rem; }
+  .mkt-val { font-size:.9rem; font-weight:700; color:var(--strong); }
+
+  /* ACTIONS */
+  .action { display:flex; gap:1rem; align-items:flex-start; padding:.7rem 0; border-bottom:1px solid var(--border); }
+  .action:last-child{border-bottom:none}
+  .action-n { font-family:'DM Mono',monospace; font-size:1rem; font-weight:500; color:var(--accent); min-width:1.5rem; line-height:1.4; }
+  .action-t { font-size:.84rem; line-height:1.5; }
+  .eff { font-family:'DM Mono',monospace; font-size:.58rem; letter-spacing:.08em; padding:.1rem .4rem; border-radius:3px; text-transform:uppercase; margin-top:.25rem; display:inline-block; }
+  .eff-quick_win{background:rgba(110,231,183,.12);color:var(--accent);border:1px solid rgba(110,231,183,.25)}
+  .eff-medium{background:rgba(245,158,11,.12);color:var(--accent2);border:1px solid rgba(245,158,11,.25)}
+  .eff-hard{background:rgba(248,113,113,.12);color:var(--accent3);border:1px solid rgba(248,113,113,.25)}
+
+  /* DIVIDER */
+  .sec-div { font-family:'DM Mono',monospace; font-size:.6rem; letter-spacing:.15em; text-transform:uppercase; color:var(--muted); padding:1.2rem 0 .5rem; border-top:1px solid var(--border); margin-top:.5rem; display:flex; align-items:center; gap:.5rem; }
+  .sec-div::after { content:''; flex:1; height:1px; background:var(--border); margin-left:.5rem; }
+
+  .fade { opacity:0; transform:translateY(10px); animation:fadeUp .45s ease forwards; }
+  @keyframes fadeUp { to{opacity:1;transform:translateY(0)} }
+  .d1{animation-delay:.05s} .d2{animation-delay:.12s} .d3{animation-delay:.2s} .d4{animation-delay:.3s} .d5{animation-delay:.4s}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- TOP BAR -->
+  <div class="topbar">
+    <div class="logo">PitchLink · Yatırımcı Analizi</div>
+    <div class="badge-le-chat">Le Chat + Notion</div>
+  </div>
+
+  <!-- ANALYZE BAR -->
+  <div class="analyze-bar">
+    <input class="url-input" id="url-input" type="text" placeholder="Notion page URL'sini yapıştır…" spellcheck="false"/>
+    <button class="btn-analyze" onclick="analyze()">Analiz Et</button>
+  </div>
+
+  <!-- HINT -->
+  <div class="hint">
+    💡 <strong>Nasıl çalışır?</strong> Le Chat, Notion sayfanı otomatik okur. Senin yapman gereken tek şey URL'yi yapıştırıp "Analiz Et"e basmak.
+    Notion bağlı değilse Le Chat'te <strong>Connectors → Notion</strong>'ı aktif et.
+  </div>
+
+  <!-- LOADING -->
+  <div class="loading" id="loading">
+    <div class="spinner"></div>
+    <div class="loading-text">Le Chat analiz ediyor…</div>
+  </div>
+
+  <!-- RESULTS -->
+  <div id="results">
+    <div class="header fade d1">
+      <div>
+        <div class="pitch-eyebrow" id="r-eyebrow">Taslak Analizi</div>
+        <div class="pitch-title" id="r-title">—</div>
+        <div class="pitch-tagline" id="r-tagline">—</div>
+      </div>
+      <div class="score-card">
+        <div class="ring">
+          <svg width="88" height="88" viewBox="0 0 88 88">
+            <circle class="ring-track" cx="44" cy="44" r="40"/>
+            <circle class="ring-fill" id="ring-arc" cx="44" cy="44" r="40"/>
+          </svg>
+          <div class="ring-inner">
+            <div class="ring-num" id="r-score">0</div>
+            <div class="ring-denom">/100</div>
+          </div>
+        </div>
+        <div class="score-grade" id="r-grade">—</div>
+        <div class="score-label" id="r-label">—</div>
+      </div>
+    </div>
+
+    <div class="memo fade d2" id="r-memo">—</div>
+
+    <div class="card fade d2">
+      <div class="card-label">Bölüm Analizi</div>
+      <div id="r-bars"></div>
+    </div>
+
+    <div class="grid2 fade d3">
+      <div class="card">
+        <div class="card-label">✅ Güçlü Yönler</div>
+        <div id="r-strengths"></div>
+      </div>
+      <div class="card">
+        <div class="card-label">⚠️ Eksikler & Risk</div>
+        <div id="r-gaps"></div>
+      </div>
+    </div>
+
+    <div class="sec-div fade d4">Pazar Sinyalleri</div>
+    <div class="mkt-grid fade d4" id="r-market"></div>
+
+    <div class="sec-div fade d5">Öncelikli Aksiyonlar</div>
+    <div class="card fade d5"><div id="r-actions"></div></div>
+  </div>
+
+</div>
+
+<script>
+const EFF = { quick_win:'Hızlı Kazanım', medium:'Orta Efor', hard:'Uzun Vadeli' }
+
+function analyze() {
+  const url = document.getElementById('url-input').value.trim()
+  if (!url) return
+
+  document.getElementById('results').style.display = 'none'
+  document.getElementById('loading').style.display = 'flex'
+
+  // Le Chat'e mesaj gönder — Notion sayfasını okuyup analiz tool'larını çağırmasını iste
+  window.parent?.postMessage({
+    type: 'pitchlink_analyze',
+    pageUrl: url,
+    instruction:
+      `Bu Notion sayfasındaki girişim taslağını analiz et: ${url}\n\n` +
+      `Adımlar:\n` +
+      `1. Notion connector\'ı ile sayfayı oku (${url})\n` +
+      `2. analyze_pitch_sections(content=<okunan içerik>, title=<başlık>)\n` +
+      `3. analyze_market_opportunity(content=<içerik>)\n` +
+      `4. calculate_pitch_score(section_scores=<adım2 skorları>, has_traction=false, narrative_clarity=60, title=<başlık>)\n` +
+      `5. render_pitch_feedback(<tüm analiz sonuçları>)`,
+  }, '*')
+
+  // Demo fallback
+  setTimeout(() => {
+    if (document.getElementById('loading').style.display !== 'none') showDemo()
+  }, 4000)
+}
+
+function numAnim(el, target) {
+  const t0 = performance.now()
+  const run = n => {
+    const t = Math.min((n-t0)/1200, 1)
+    el.textContent = Math.round((1-Math.pow(1-t,3))*target)
+    if (t < 1) requestAnimationFrame(run)
+  }
+  requestAnimationFrame(run)
+}
+
+function arcAnim(score) {
+  const arc = document.getElementById('ring-arc')
+  const c = score >= 70 ? '#6EE7B7' : score >= 50 ? '#60A5FA' : score >= 35 ? '#F59E0B' : '#F87171'
+  arc.style.stroke = c
+  arc.style.filter = `drop-shadow(0 0 8px ${c}60)`
+  setTimeout(() => arc.style.strokeDashoffset = 251 - (score/100)*251, 150)
+}
+
+function render(d) {
+  document.getElementById('loading').style.display = 'none'
+  document.getElementById('results').style.display = 'block'
+
+  document.getElementById('r-title').textContent   = d.title || '—'
+  document.getElementById('r-tagline').textContent = d.tagline || ''
+  document.getElementById('r-memo').textContent    = d.investor_memo || ''
+  document.getElementById('r-grade').textContent   = d.grade || '—'
+  document.getElementById('r-label').textContent   = d.label || ''
+
+  numAnim(document.getElementById('r-score'), d.total_score || 0)
+  arcAnim(d.total_score || 0)
+
+  // Bars
+  const barsEl = document.getElementById('r-bars')
+  barsEl.innerHTML = ''
+  ;(d.section_scores || []).forEach(s => {
+    const row = document.createElement('div')
+    row.className = `sec-row v-${s.verdict}`
+    row.innerHTML = `<span class="sec-icon">${s.icon}</span><span class="sec-name">${s.name}</span><div class="bar-wrap"><div class="bar" data-w="${s.score}%"></div></div><span class="sec-score">${s.score}</span>`
+    barsEl.appendChild(row)
+  })
+  setTimeout(() => document.querySelectorAll('.bar').forEach(b => b.style.width = b.dataset.w), 150)
+
+  document.getElementById('r-strengths').innerHTML = (d.strengths||[]).map(s =>
+    `<div class="item"><div class="item-icon">${s.icon}</div><div><div class="item-title">${s.title}</div><div class="item-detail">${s.detail}</div></div></div>`
+  ).join('')
+
+  document.getElementById('r-gaps').innerHTML = (d.gaps||[]).map(g =>
+    `<div class="item"><div class="item-icon">${g.icon}</div><div><div class="item-title">${g.title}<span class="bx bx-${g.priority}">${g.priority}</span></div><div class="item-detail">${g.detail}</div></div></div>`
+  ).join('')
+
+  const m = d.market_signals || {}
+  document.getElementById('r-market').innerHTML = `
+    <div class="mkt-pill"><div class="mkt-label">TAM</div><div class="mkt-val">${m.tam_label||'—'}</div></div>
+    <div class="mkt-pill"><div class="mkt-label">SAM</div><div class="mkt-val">${m.sam_label||'—'}</div></div>
+    <div class="mkt-pill"><div class="mkt-label">Büyüme</div><div class="mkt-val">${m.growth_rate||'—'}</div></div>
+    <div class="mkt-pill"><div class="mkt-label">Değerlendirme</div><div class="mkt-val" style="font-size:.74rem;color:#9CA3AF">${m.market_verdict||'—'}</div></div>`
+
+  document.getElementById('r-actions').innerHTML = (d.top_actions||[]).map(a =>
+    `<div class="action"><div class="action-n">0${a.number}</div><div><div class="action-t">${a.action}</div><span class="eff eff-${a.effort}">${EFF[a.effort]||a.effort}</span></div></div>`
+  ).join('')
+}
+
+function showDemo() {
+  render({
+    title:'Demo Taslak', tagline:'B2B SaaS · Örnek',
+    total_score:67, grade:'B', label:'Güçlü Potansiyel 💪',
+    investor_memo:'Le Chat bağlı olmadığı için demo verisi gösteriliyor. Notion URL\'nizi girin ve Le Chat\'te PitchLink connector\'ını aktif edin.',
+    section_scores:[
+      {name:'Problem',icon:'🔥',score:78,verdict:'good'},
+      {name:'Çözüm',icon:'⚡',score:82,verdict:'strong'},
+      {name:'Pazar',icon:'📊',score:45,verdict:'weak'},
+      {name:'Ekip',icon:'👥',score:75,verdict:'good'},
+      {name:'Finansal',icon:'💰',score:30,verdict:'missing'},
+    ],
+    strengths:[
+      {icon:'🎯',title:'Net Problem',detail:'Problem somut kullanıcı verisiyle desteklenmiş.'},
+      {icon:'🔧',title:'Teknik Derinlik',detail:'Çözüm adım adım açıklanmış.'},
+      {icon:'🏆',title:'Deneyimli Kurucu',detail:'10 yıl sektör deneyimi var.'},
+    ],
+    gaps:[
+      {icon:'📈',title:'TAM/SAM/SOM Yok',detail:'Sayısal pazar verisi yok.',priority:'critical'},
+      {icon:'💸',title:'Finansal Projeksiyon Eksik',detail:'3 yıllık model yok.',priority:'critical'},
+      {icon:'🤝',title:'Traction Zayıf',detail:'Pilot müşteri eklenebilir.',priority:'high'},
+    ],
+    top_actions:[
+      {number:1,action:'TAM/SAM/SOM bottom-up hesaplama ekleyin.',effort:'medium'},
+      {number:2,action:'3 yıllık P&L + CAC/LTV tablosu yapın.',effort:'medium'},
+      {number:3,action:'2 pilot müşteri letter of intent ekleyin.',effort:'hard'},
+    ],
+    market_signals:{tam_label:'Belirtilmemiş',sam_label:'Belirtilmemiş',growth_rate:'Bilinmiyor',market_verdict:'Yetersiz analiz'},
+  })
+}
+
+// Le Chat'ten gelen veri
+window.addEventListener('message', e => {
+  try {
+    const d = e.data
+    if (d?.type === 'tool_result' && d?.toolName === 'render_pitch_feedback') render(d.data)
+    if (d?.title && d?.total_score !== undefined) render(d)
+  } catch(err) { console.error(err) }
+})
+
+document.addEventListener('keydown', e => { if (e.key === 'Enter') analyze() })
+</script>
+</body>
+</html>
